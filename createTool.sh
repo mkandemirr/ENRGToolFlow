@@ -9,14 +9,15 @@
 #   - main.cpp
 #   - CMakeLists.txt
 #   - config.ini
+#   - README.md
 #
 # The script also updates tools/toolRegistry.txt.
 #
 # Usage:
-#   ./createTool <toolName>
+#   ./createTool.sh <toolName>
 #
 # Example:
-#   ./createTool tool1
+#   ./createTool.sh computeBaseline
 # ------------------------------------------------------------
 
 # ------------------------------------------------------------
@@ -49,7 +50,7 @@ updateToolRegistry()
 
 # Check that a tool name is provided.
 if [ $# -lt 1 ]; then
-    echo "Usage: ./createTool <toolName>"
+    echo "Usage: ./createTool.sh <toolName>"
     exit 1
 fi
 
@@ -82,31 +83,33 @@ cat > "${TOOL_DIR}/main.cpp" <<EOF
 #include <string>
 #include "INIReader.h"
 
-void ${TOOL_NAME}(const INIReader& iniReader);
+// Returns 0 on success, non-zero on failure.
+int ${TOOL_NAME}(const INIReader& iniReader);
 
 int main(int argc, char* argv[])
 {
-   if (argc < 2) {
-      std::cerr << "Usage: ./bin/${TOOL_NAME} <config.ini>" << std::endl;
+   if (argc < 2)
+   {
+      std::cerr << "Usage: ./bin/${TOOL_NAME} configs/${TOOL_NAME}/config.ini"
+                << std::endl;
       return 1;
    }
 
    INIReader iniReader(argv[1]);
 
-   if (iniReader.ParseError() != 0) {
+   if (iniReader.ParseError() != 0)
+   {
       std::cerr << "Error: could not load config file: "
                 << argv[1] << std::endl;
       return 1;
    }
 
-   ${TOOL_NAME}(iniReader);
-
-   return 0;
+   return ${TOOL_NAME}(iniReader);
 }
 
-void ${TOOL_NAME}(const INIReader& iniReader)
+int ${TOOL_NAME}(const INIReader& iniReader)
 {
-
+   return 0;
 }
 EOF
 
@@ -131,10 +134,25 @@ touch "${TOOL_DIR}/config.ini"
 cat > "${TOOL_DIR}/README.md" <<EOF
 # ${TOOL_NAME}
 
-## Description
+## Purpose
+One or two sentences.
 
-Briefly describe what this tool does.
+## Input
+File type, TTree and branch names.
 
+## Output
+File, TTree, new branches with units, histograms.
+
+## Configuration
+| Section | Key | Unit | Description |
+|---|---|---|---|
+
+## Usage
+\`\`\`bash
+./bin/${TOOL_NAME} configs/${TOOL_NAME}/config.ini
+\`\`\`
+
+## Notes / known limitations
 EOF
 
 
