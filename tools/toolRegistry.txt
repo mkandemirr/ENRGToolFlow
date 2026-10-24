@@ -1,8 +1,4 @@
-Total tools: 6
+Total tools: 2
 
+convertWaveforms
 runPipeline
-tool1
-tool2
-tool3
-tool4
-tool5

@@ -151,7 +151,7 @@ Build selected Tools
 
 ```bash
 cmake ../<source_dir> \
-    -DTOOLS="tools/tool1;tools/tool2"
+    -DTOOLS="tools/convertWaveforms;tools/myTool"
 
 cmake --build . -j
 ```
@@ -206,11 +206,7 @@ Run a ToolChain
 
 # Examples
 
-ToolFlow includes several example Tools demonstrating common development patterns.
-
-- **tool1** – Basic Tool structure, INI configuration, and an interactive ROOT application.
-- **tool2** – Extending a Tool with additional source files and custom C++ classes.
-- **tool3** – Using reusable classes from the `shared/` directory.
-- **tool4** – Generating event data and writing it to a ROOT `TTree`.
-- **tool5** – Reading a ROOT `TTree`, processing events, and writing new branches to a new ROOT file.
-- **toolChain1** – Building a complete analysis workflow by executing `tool4` followed by `tool5`.
+The original ToolFlow example Tools (`tool1`–`tool5`, `toolChain1`) were removed
+from this repository once the first ENRG Tool existed. They are still available in
+the [ToolFlow](https://github.com/mkandemirr/ToolFlow) repository and in the git
+history of this repository. `tools/convertWaveforms` is the reference Tool here.

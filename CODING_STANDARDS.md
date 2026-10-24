@@ -48,6 +48,19 @@ void ComputeBaseline(const std::vector<double>& samples)
 
 - Names of physical quantities **end with their unit**: `timeNs`, `amplitudeMv`, `chargePc`, `rateHz`. Branch names coming from ENRGDAQ (`value_mv`, `real_ns_timestamp`, ...) are kept as they are.
 - Counts use the `n` prefix: `nEvents`, `nChannels`.
+- Vector branches are named after the object they belong to, not after their type
+  (no `Vec` suffix). Per-object vectors share the object name as prefix and have
+  the length given by the matching `n` counter; event-level branches have no prefix.
+  Example (`events` tree of convertWaveforms):
+
+| Group | Prefix | Length | Branches |
+|---|---|---|---|
+| event | none | 1 | `eventCounter`, `triggerTimeNs`, `nChannels`, `qualityFlags` |
+| channel | `channel` | `nChannels` | `channelId`, `channelNSamples` |
+| sample | `sample` | Σ `channelNSamples` | `sampleValueMv` |
+
+  A later pulse collection would follow the same rule: `nPulses`, `pulseChannelId`,
+  `pulseTimeNs`, `pulseChargePc`.
 - **[DECISION]** Existing `shared/` sources use `.cc`, Tools use `.cpp`. Proposal: new files use `.cpp` / `.h`, and the `shared/` CMake glob is updated to accept both extensions.
 
 ## 3. Tool structure

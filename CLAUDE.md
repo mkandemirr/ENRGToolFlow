@@ -26,7 +26,7 @@ This repository contains the analysis code for the ~1 t Gd-doped water Cherenkov
 - `shared/`: classes used by more than one Tool.
 - `iniReader/`: INI parser (inih).
 - Tools communicate through ROOT files: read an input TTree, add new branches, write a new file. Never overwrite the input file.
-- `tool1`–`tool5` and `toolChain1` are ToolFlow examples. They can be removed once ENRG Tools exist.
+- The ToolFlow example Tools were removed; `tools/convertWaveforms` is the reference Tool.
 
 Build and run (out-of-source, in `~/Desktop/enrg/build`; never create a build directory inside the repository):
 

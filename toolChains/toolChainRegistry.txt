@@ -1,6 +1,2 @@
-Total toolChains: 1
-
-toolChain1:
-  tool4
-  tool5
+Total toolChains: 0
 

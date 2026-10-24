@@ -17,7 +17,7 @@ set(SHARED_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/shared/include")
 set(SHARED_SRC_DIR     "${CMAKE_SOURCE_DIR}/shared/src")
 set(INIREADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/iniReader")
 
-file(GLOB_RECURSE SHARED_SOURCES "${SHARED_SRC_DIR}/*.cc")
+file(GLOB_RECURSE SHARED_SOURCES "${SHARED_SRC_DIR}/*.cc" "${SHARED_SRC_DIR}/*.cpp")
 
 add_library(MySharedLib SHARED
   ${SHARED_SOURCES}
@@ -26,6 +26,7 @@ add_library(MySharedLib SHARED
 target_include_directories(MySharedLib
   PUBLIC
     ${SHARED_INCLUDE_DIR}
+    ${INIREADER_INCLUDE_DIR}
 )
 
 target_link_libraries(MySharedLib
