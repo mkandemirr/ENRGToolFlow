@@ -11,6 +11,8 @@ This repository contains the analysis code for the ~1 t Gd-doped water Cherenkov
 ~/Desktop/enrg/
 ├── docs/          # notes (docx), Dedektör Ar-Ge.pdf, runs_history.xlsx (not in git)
 ├── runs/          # raw data: run_<N>_waveforms.root (not in git, files are several GB)
+├── build/         # out-of-source build directory (outside the repository)
+├── output/        # ROOT/PDF output of the Tools (not in git)
 └── ENRGToolFlow/  # this repository
 ```
 
@@ -26,15 +28,17 @@ This repository contains the analysis code for the ~1 t Gd-doped water Cherenkov
 - Tools communicate through ROOT files: read an input TTree, add new branches, write a new file. Never overwrite the input file.
 - `tool1`–`tool5` and `toolChain1` are ToolFlow examples. They can be removed once ENRG Tools exist.
 
-Build and run:
+Build and run (out-of-source, in `~/Desktop/enrg/build`; never create a build directory inside the repository):
 
 ```bash
-mkdir -p build && cd build
-cmake .. [-DTOOLS="tools/X;tools/Y"] [-DTOOLCHAINS="toolChains/Z"]
+mkdir -p ~/Desktop/enrg/build && cd ~/Desktop/enrg/build
+cmake ../ENRGToolFlow [-DTOOLS="tools/X;tools/Y"] [-DTOOLCHAINS="toolChains/Z"]
 cmake --build . -j
-./bin/<tool> <config.ini>
+./bin/<tool> configs/<tool>/config.ini
 ./bin/runPipeline toolChains/<Chain>/<Chain>.tchain
 ```
+
+Tools are run from `~/Desktop/enrg/build`, so relative paths in config files are resolved from there (e.g. `../runs/run_103_waveforms.root`).
 
 ## Detector (summary)
 

@@ -77,11 +77,11 @@ tools/<toolName>/
 
 ```ini
 [input]
-rootFile = ../runs/run_103_waveforms.root
+rootFile = ../runs/run_103_waveforms.root   ; relative to ~/Desktop/enrg/build
 treeName = digitizer_waveforms
 
 [output]
-rootFile = output/run_103_baseline.root
+rootFile = ../output/run_103_baseline.root
 
 [analysis]
 baselineWindowNs = 100      ; number of leading samples used for the baseline
