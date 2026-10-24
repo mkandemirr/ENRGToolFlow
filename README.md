@@ -1,4 +1,4 @@
-# ToolFlow
+# ENRGToolFlow
 
 ToolFlow provides a lightweight C++ project skeleton for developing modular scientific analysis software using [CERN ROOT](https://root.cern/).
 
