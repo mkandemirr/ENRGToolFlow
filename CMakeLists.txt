@@ -5,13 +5,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ------------------------------------------------------------
-# 1) ROOT'u bul
+# 1) Find ROOT
 # ------------------------------------------------------------
 find_package(ROOT REQUIRED)
 include(${ROOT_USE_FILE})
 
 # ------------------------------------------------------------
-# 2) shared/ altındaki kaynaklardan kütüphane oluştur (dictionary YOK)
+# 2) Build a library from the sources in shared/ (no ROOT dictionary)
 # ------------------------------------------------------------
 set(SHARED_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/shared/include")
 set(SHARED_SRC_DIR     "${CMAKE_SOURCE_DIR}/shared/src")
@@ -61,7 +61,7 @@ function(addTool toolName)
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
    )
 
-    # Config dosyalarını kopyala
+    # Copy the config files
     set(CONFIG_OUTPUT_DIR ${CMAKE_BINARY_DIR}/configs/${toolName})
     file(MAKE_DIRECTORY ${CONFIG_OUTPUT_DIR})
 
