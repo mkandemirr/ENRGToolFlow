@@ -2,7 +2,7 @@
 #include <iostream>
 #include <string>
 #include <cstdlib>
-#include <stdexcept>
+#include <sys/wait.h>
 
 const std::string RED    = "\033[1;31m";
 const std::string GREEN  = "\033[1;32m";
@@ -25,11 +25,11 @@ int main(int argc, char* argv[])
     std::ifstream infile(chainFile);
 
     if (!infile.is_open())
-   {
-       throw std::runtime_error(
-           "Cannot open chain file: " + chainFile
-       );
-   }
+    {
+        std::cerr << "Error: cannot open chain file: " << chainFile << std::endl;
+
+        return 1;
+    }
 
     std::string command;
 
@@ -44,7 +44,19 @@ int main(int argc, char* argv[])
     << YELLOW << command << RESET << std::endl
     << "======================================" << std::endl;
 
-        int ret = std::system(command.c_str());
+        // std::system() returns a wait status, not an exit code (exit 1 -> 256).
+        // Returning it from main() unchanged would be truncated to 0 by the shell.
+        int status = std::system(command.c_str());
+        int ret = 1;
+
+        if (status != -1 && WIFEXITED(status))
+        {
+            ret = WEXITSTATUS(status);
+        }
+        else if (status != -1 && WIFSIGNALED(status))
+        {
+            ret = 128 + WTERMSIG(status);
+        }
 
         if (ret != 0)
         {
