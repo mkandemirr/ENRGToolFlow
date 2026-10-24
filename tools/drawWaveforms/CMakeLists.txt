@@ -1,0 +1,1 @@
+addTool(drawWaveforms)

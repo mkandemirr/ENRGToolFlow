@@ -1,4 +1,5 @@
-Total tools: 2
+Total tools: 3
 
 convertWaveforms
+drawWaveforms
 runPipeline
