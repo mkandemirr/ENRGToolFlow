@@ -20,7 +20,6 @@
 #include "ConfigReader.h"
 #include "Event.h"
 #include "INIReader.h"
-#include "Utils.h"
 
 // Returns 0 on success, non-zero on failure.
 int drawWaveforms(const INIReader& iniReader);
@@ -56,104 +55,54 @@ const double kPanelTopMargin = 0.03;
 
 struct DisplaySettings
 {
-   UInt_t baselineWindowNs;
-   UInt_t pulseSearchStartNs;
-   UInt_t pulseSearchEndNs;
-   double pulseThresholdMv;
-   UInt_t zoomHalfWidthNs;
+   UInt_t zoomStartNs;
+   UInt_t zoomEndNs;
    UInt_t nEnvelopeBins;
-   UInt_t minPlateauSamples;
-   double minSaturationDepthMv;
    double minYHalfRangeMv;
    double yPaddingMv;
 };
 
-struct ChannelStats
+struct ChannelRange
 {
-   double baselineMv = 0;
-   double rmsMv = 0;
    int minMv = 0;
    int maxMv = 0;
    UInt_t minIndex = 0;
-   UInt_t plateauSamples = 0;  // longest run of consecutive samples at minMv
-   bool possibleSaturation = false;
 };
 
-ChannelStats ComputeStats(const Waveform& waveform, const DisplaySettings& settings)
+// Minimum and maximum of the samples first..last (inclusive).
+ChannelRange FindRange(const Waveform& waveform, UInt_t first, UInt_t last)
 {
-   ChannelStats stats;
-   const UInt_t nSamples = waveform.GetNSamples();
-   const Utils::BaselineResult baseline =
-      Utils::ComputeBaseline(waveform, 0, settings.baselineWindowNs);
-   stats.baselineMv = baseline.meanMv;
-   stats.rmsMv = baseline.rmsMv;
-   stats.minMv = waveform.GetValueMv(0);
-   stats.maxMv = waveform.GetValueMv(0);
+   ChannelRange range;
+   range.minMv = waveform.GetValueMv(first);
+   range.maxMv = range.minMv;
+   range.minIndex = first;
 
-   for (UInt_t i = 1; i < nSamples; ++i)
+   for (UInt_t i = first + 1; i <= last; ++i)
    {
       const int value = waveform.GetValueMv(i);
 
-      if (value < stats.minMv)
+      if (value < range.minMv)
       {
-         stats.minMv = value;
-         stats.minIndex = i;
+         range.minMv = value;
+         range.minIndex = i;
       }
 
-      stats.maxMv = std::max(stats.maxMv, value);
+      range.maxMv = std::max(range.maxMv, value);
    }
 
-   UInt_t run = 0;
-
-   for (UInt_t i = 0; i < nSamples; ++i)
-   {
-      run = (waveform.GetValueMv(i) == stats.minMv) ? run + 1 : 0;
-      stats.plateauSamples = std::max(stats.plateauSamples, run);
-   }
-
-   // A pulse that clips at the bottom of the ADC range shows a flat minimum. The
-   // exact clipping level depends on the DC offset, which is not in the file, so a
-   // configured minimum depth stands in for it: small pulses often have a few equal
-   // samples at their peak and must not be flagged.
-   stats.possibleSaturation =
-      stats.minMv - stats.baselineMv < -settings.minSaturationDepthMv
-      && stats.plateauSamples >= settings.minPlateauSamples;
-
-   return stats;
+   return range;
 }
 
-// Deepest sample below baseline inside the pulse search window of all drawn
-// channels; the middle of the window if no sample passes the pulse threshold.
-UInt_t FindZoomCenter(const std::vector<std::optional<Channel>>& channels,
-                      const std::vector<ChannelStats>& stats,
-                      const DisplaySettings& settings)
+// The y axis spans at least 0 +- minYHalfRangeMv, so that noise-only channels are
+// not stretched to fill the panel.
+double LowerYLimit(const ChannelRange& range, const DisplaySettings& settings)
 {
-   UInt_t center = (settings.pulseSearchStartNs + settings.pulseSearchEndNs) / 2;
-   double deepestMv = -settings.pulseThresholdMv;
+   return std::min(-settings.minYHalfRangeMv, range.minMv - settings.yPaddingMv);
+}
 
-   for (size_t row = 0; row < channels.size(); ++row)
-   {
-      if (!channels[row])
-      {
-         continue;
-      }
-
-      const Waveform& waveform = channels[row]->GetWaveform();
-      const UInt_t last = std::min(settings.pulseSearchEndNs, waveform.GetNSamples() - 1);
-
-      for (UInt_t i = settings.pulseSearchStartNs; i <= last; ++i)
-      {
-         const double depthMv = waveform.GetValueMv(i) - stats[row].baselineMv;
-
-         if (depthMv < deepestMv)
-         {
-            deepestMv = depthMv;
-            center = i;
-         }
-      }
-   }
-
-   return center;
+double UpperYLimit(const ChannelRange& range, const DisplaySettings& settings)
+{
+   return std::max(settings.minYHalfRangeMv, range.maxMv + settings.yPaddingMv);
 }
 
 void StyleGraph(TGraph* graph, int color, double yMin, double yMax)
@@ -216,17 +165,14 @@ std::string DescribeQualityFlags(UInt_t flags)
    return text;
 }
 
-// Draws one event on the canvas. Returns the number of channels flagged as
-// possibly saturated.
-int DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
-                  const std::string& fileLabel, const std::vector<int>& channelIds,
-                  const DisplaySettings& settings)
+// Draws one event on the canvas.
+void DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
+                   const std::string& fileLabel, const std::vector<int>& channelIds,
+                   const DisplaySettings& settings)
 {
    const size_t nRows = channelIds.size();
    std::vector<std::optional<Channel>> channels(nRows);
-   std::vector<ChannelStats> stats(nRows);
    UInt_t nSamplesShown = 0;
-   int nSaturated = 0;
 
    for (size_t row = 0; row < nRows; ++row)
    {
@@ -234,16 +180,10 @@ int DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
 
       if (channels[row])
       {
-         const Waveform& waveform = channels[row]->GetWaveform();
-         stats[row] = ComputeStats(waveform, settings);
-         nSamplesShown = std::max(nSamplesShown, waveform.GetNSamples());
+         nSamplesShown = std::max(nSamplesShown,
+                                  channels[row]->GetWaveform().GetNSamples());
       }
    }
-
-   const UInt_t center = FindZoomCenter(channels, stats, settings);
-   const UInt_t zoomFirst = center > settings.zoomHalfWidthNs
-                               ? center - settings.zoomHalfWidthNs : 0;
-   const UInt_t zoomLast = center + settings.zoomHalfWidthNs;
 
    canvas->Clear();
    canvas->cd();
@@ -263,9 +203,9 @@ int DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
    latex.DrawLatex(0.01, 0.968,
                    Form("%zu channels, up to %u samples (1 sample = 1 ns). Left: full "
                         "window [#mus], min/max envelope in %u bins. Right: samples "
-                        "%u-%u. Dashed line: zoom centre (%u).",
-                        nRows, nSamplesShown, settings.nEnvelopeBins, zoomFirst,
-                        zoomLast, center));
+                        "%u-%u (dashed lines on the left).",
+                        nRows, nSamplesShown, settings.nEnvelopeBins,
+                        settings.zoomStartNs, settings.zoomEndNs));
 
    TPad* mainPad = new TPad("mainPad", "", 0.0, 0.0, 1.0, 0.962);
    mainPad->SetBit(kCanDelete);
@@ -297,11 +237,10 @@ int DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
       }
 
       const Waveform& waveform = channels[row]->GetWaveform();
-      const ChannelStats& s = stats[row];
-      const double yMin = std::min(s.baselineMv - settings.minYHalfRangeMv,
-                                   s.minMv - settings.yPaddingMv);
-      const double yMax = std::max(s.baselineMv + settings.minYHalfRangeMv,
-                                   s.maxMv + settings.yPaddingMv);
+      const UInt_t lastSample = waveform.GetNSamples() - 1;
+      const ChannelRange full = FindRange(waveform, 0, lastSample);
+      const double yMin = LowerYLimit(full, settings);
+      const double yMax = UpperYLimit(full, settings);
 
       TGraph* envelope = MakeEnvelopeGraph(waveform, settings.nEnvelopeBins);
       envelope->SetBit(kCanDelete);
@@ -315,55 +254,45 @@ int DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
       }
 
       envelope->Draw("AL");
-      line.DrawLine(center * 1e-3, yMin, center * 1e-3, yMax);
+      line.DrawLine(settings.zoomStartNs * 1e-3, yMin, settings.zoomStartNs * 1e-3, yMax);
+      line.DrawLine(settings.zoomEndNs * 1e-3, yMin, settings.zoomEndNs * 1e-3, yMax);
 
       latex.SetTextSize(0.08);
       latex.SetTextAlign(31);
       latex.DrawLatex(0.975, lastRow ? 0.34 : 0.14,
-                      Form("min %d mV @ %u ns | baseline %.2f mV | rms %.2f mV",
-                           s.minMv, s.minIndex, s.baselineMv, s.rmsMv));
+                      Form("min %d mV @ %u ns | max %d mV",
+                           full.minMv, full.minIndex, full.maxMv));
       latex.SetTextAlign(11);
 
-      if (s.possibleSaturation)
-      {
-         latex.SetTextColor(kRed + 1);
-         latex.DrawLatex(0.09, 0.80, Form("possible saturation (%u samples at %d mV)",
-                                          s.plateauSamples, s.minMv));
-         latex.SetTextColor(kBlack);
-         ++nSaturated;
-      }
-
-      // Right: zoom around the centre, every sample.
+      // Right: zoom window, every sample.
       mainPad->cd(2 * row + 2);
       gPad->SetMargin(0.10, 0.02, bottomMargin, kPanelTopMargin);
 
-      const UInt_t last = std::min(zoomLast, waveform.GetNSamples() - 1);
-
-      if (zoomFirst > last)
+      if (settings.zoomStartNs > lastSample)
       {
+         latex.SetTextSize(0.12);
+         latex.SetTextColor(kRed + 1);
+         latex.DrawLatex(0.1, 0.5, Form("zoom window outside the record (%u samples)",
+                                        waveform.GetNSamples()));
+         latex.SetTextColor(kBlack);
          continue;
       }
 
-      const UInt_t nZoom = last - zoomFirst + 1;
+      const UInt_t zoomLast = std::min(settings.zoomEndNs, lastSample);
+      const UInt_t nZoom = zoomLast - settings.zoomStartNs + 1;
+      const ChannelRange zoomRange = FindRange(waveform, settings.zoomStartNs, zoomLast);
       TGraph* zoom = new TGraph(nZoom);
       zoom->SetBit(kCanDelete);
-      int zoomMinMv = waveform.GetValueMv(zoomFirst);
-      int zoomMaxMv = zoomMinMv;
 
       for (UInt_t i = 0; i < nZoom; ++i)
       {
-         const int value = waveform.GetValueMv(zoomFirst + i);
-         zoom->SetPoint(i, zoomFirst + i, value);
-         zoomMinMv = std::min(zoomMinMv, value);
-         zoomMaxMv = std::max(zoomMaxMv, value);
+         const UInt_t sample = settings.zoomStartNs + i;
+         zoom->SetPoint(i, sample, waveform.GetValueMv(sample));
       }
 
-      StyleGraph(zoom, color,
-                 std::min(s.baselineMv - settings.minYHalfRangeMv,
-                          zoomMinMv - settings.yPaddingMv),
-                 std::max(s.baselineMv + settings.minYHalfRangeMv,
-                          zoomMaxMv + settings.yPaddingMv));
-      zoom->GetXaxis()->SetLimits(zoomFirst, last);
+      StyleGraph(zoom, color, LowerYLimit(zoomRange, settings),
+                 UpperYLimit(zoomRange, settings));
+      zoom->GetXaxis()->SetLimits(settings.zoomStartNs, zoomLast);
       zoom->GetXaxis()->SetNdivisions(505);
 
       if (lastRow)
@@ -373,8 +302,6 @@ int DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
 
       zoom->Draw("AL");
    }
-
-   return nSaturated;
 }
 }
 
@@ -389,18 +316,11 @@ int drawWaveforms(const INIReader& iniReader)
    const long long firstEntry = config.GetInteger("analysis", "firstEntry");
    const long long maxEvents = config.GetInteger("analysis", "maxEvents");
    const std::vector<int> channelIds = config.GetIntegerList("analysis", "channels");
-
-   const long long baselineWindowNs = config.GetInteger("analysis", "baselineWindowNs");
+   const long long zoomStartNs = config.GetInteger("analysis", "zoomStartNs");
+   const long long zoomEndNs = config.GetInteger("analysis", "zoomEndNs");
 
    DisplaySettings settings;
-   settings.baselineWindowNs = baselineWindowNs;
-   settings.pulseSearchStartNs = config.GetInteger("analysis", "pulseSearchStartNs");
-   settings.pulseSearchEndNs = config.GetInteger("analysis", "pulseSearchEndNs");
-   settings.pulseThresholdMv = config.GetReal("analysis", "pulseThresholdMv");
-   settings.zoomHalfWidthNs = config.GetInteger("analysis", "zoomHalfWidthNs");
    settings.nEnvelopeBins = config.GetInteger("analysis", "nEnvelopeBins");
-   settings.minPlateauSamples = config.GetInteger("analysis", "minPlateauSamples");
-   settings.minSaturationDepthMv = config.GetReal("analysis", "minSaturationDepthMv");
    settings.minYHalfRangeMv = config.GetReal("analysis", "minYHalfRangeMv");
    settings.yPaddingMv = config.GetReal("analysis", "yPaddingMv");
 
@@ -409,20 +329,17 @@ int drawWaveforms(const INIReader& iniReader)
       return 1;
    }
 
-   // Checked before the conversion to UInt_t matters: a negative value would wrap
-   // to a huge window and silently use the whole record, pulses included.
-   if (baselineWindowNs < 1)
+   // Checked before the conversion to UInt_t: a negative value would wrap to a huge
+   // sample index.
+   if (zoomStartNs < 0 || zoomEndNs < zoomStartNs)
    {
-      std::cerr << "Error: baselineWindowNs must be at least 1" << std::endl;
-      return 1;
-   }
-
-   if (settings.pulseSearchEndNs < settings.pulseSearchStartNs)
-   {
-      std::cerr << "Error: pulseSearchEndNs is smaller than pulseSearchStartNs"
+      std::cerr << "Error: zoom window must satisfy 0 <= zoomStartNs <= zoomEndNs"
                 << std::endl;
       return 1;
    }
+
+   settings.zoomStartNs = zoomStartNs;
+   settings.zoomEndNs = zoomEndNs;
 
    namespace fs = std::filesystem;
    std::error_code errorCode;
@@ -489,14 +406,12 @@ int drawWaveforms(const INIReader& iniReader)
    canvas.Print((pdfFileName + "[").c_str());
 
    Long64_t nPages = 0;
-   Long64_t nSaturatedChannels = 0;
    const Long64_t nToDraw = lastEntry - firstEntry + 1;
 
    for (Long64_t entry = firstEntry; entry <= lastEntry; ++entry)
    {
       tree->GetEntry(entry);
-      nSaturatedChannels += DrawEventPage(&canvas, event, entry, fileLabel, channelIds,
-                                          settings);
+      DrawEventPage(&canvas, event, entry, fileLabel, channelIds, settings);
       canvas.Print(pdfFileName.c_str());
       ++nPages;
 
@@ -515,8 +430,6 @@ int drawWaveforms(const INIReader& iniReader)
    std::cout << "Events drawn:    " << nPages << " (entries " << firstEntry << "-"
              << lastEntry << ")" << std::endl;
    std::cout << "Events skipped:  0" << std::endl;
-   std::cout << "Channels flagged as possible saturation: " << nSaturatedChannels
-             << std::endl;
 
    return 0;
 }
