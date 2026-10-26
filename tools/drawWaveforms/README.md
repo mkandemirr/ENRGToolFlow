@@ -101,5 +101,4 @@ All keys are required.
 
 ## Notes / known limitations
 - Visualisation only; runs in batch mode and writes a PDF (no interactive window).
-- Results of analysis Tools (baseline, pulses, saturation) are not shown yet. They
-  can later be drawn on top of the waveforms by reading their friend trees.
+- Results of analysis Tools (baseline, pulses, saturation) are not shown yet.
