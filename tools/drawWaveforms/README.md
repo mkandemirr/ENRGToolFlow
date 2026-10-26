@@ -16,7 +16,7 @@ PDF file `run_<N>_drawWaveforms.pdf`. Each page shows:
 
 - header: input file, tree entry, `eventCounter` (the two differ after counter
   gaps), t0 (`triggerTimeNs`) and the `qualityFlags` of the event;
-- left panel per channel: the full window in µs, drawn as a min/max envelope in
+- left panel per channel: the full window, drawn as a min/max envelope in
   `nEnvelopeBins` bins (single-sample spikes stay visible); a light red band marks
   the zoom window; the text gives the minimum, its position and the maximum of all
   samples of the channel;
@@ -33,16 +33,16 @@ length and post-trigger size), so the window must be set per run. In run 103 the
 prompt pulses peak at sample index ≈ 11 206–11 224
 (`docs/ENRGDAQ_Veri_Formati.docx`, section 5.2), hence the default 11150–11350.
 
-The band has the true width of the window on the µs axis. A narrow window (the
+The band has the true width of the window on the full-record axis. A narrow window (the
 default 200 ns is about 0.3 % of a 65 536-sample record) is therefore a thin
 stripe of a few pixels; a wider window shows as a wider band.
 
 If the window extends past the end of a channel's record, the panel is cut at the
 last sample. If it starts after the last sample, the panel says so instead.
 
-**Units:** `zoomStartNs` and `zoomEndNs` are in ns (1 sample = 1 ns), while the
-time axis of the left-hand panels is in µs. A pulse seen at 11.2 µs on the left is
-at sample 11200, so the window must be written as 11150–11350, not 11.15–11.35.
+**Units:** both panels and the `zoomStartNs` and `zoomEndNs` keys use the sample
+index (1 sample = 1 ns), so a pulse seen at 11200 on the left is at sample 11200 in
+the config.
 
 ### Full-window envelope (`nEnvelopeBins`)
 

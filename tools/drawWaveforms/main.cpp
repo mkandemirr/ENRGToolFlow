@@ -137,9 +137,9 @@ TGraph* MakeEnvelopeGraph(const Waveform& waveform, UInt_t nBins)
       const UInt_t end = static_cast<ULong64_t>(bin + 1) * nSamples / nBins;
       const auto [minIt, maxIt] = std::minmax_element(waveform.GetValuesMv() + first,
                                                       waveform.GetValuesMv() + end);
-      const double xUs = 0.5 * (first + end) * 1e-3;
-      graph->SetPoint(2 * bin, xUs, *minIt);
-      graph->SetPoint(2 * bin + 1, xUs, *maxIt);
+      const double xNs = 0.5 * (first + end);
+      graph->SetPoint(2 * bin, xNs, *minIt);
+      graph->SetPoint(2 * bin + 1, xNs, *maxIt);
    }
 
    return graph;
@@ -202,7 +202,7 @@ void DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
    latex.SetTextSize(0.0105);
    latex.DrawLatex(0.01, 0.968,
                    Form("%zu channels, up to %u samples (1 sample = 1 ns). Left: full "
-                        "window [#mus], min/max envelope in %u bins. Right: samples "
+                        "window, min/max envelope in %u bins. Right: samples "
                         "%u-%u (red band on the left).",
                         nRows, nSamplesShown, settings.nEnvelopeBins,
                         settings.zoomStartNs, settings.zoomEndNs));
@@ -245,18 +245,17 @@ void DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
       TGraph* envelope = MakeEnvelopeGraph(waveform, settings.nEnvelopeBins);
       envelope->SetBit(kCanDelete);
       StyleGraph(envelope, color, yMin, yMax);
-      envelope->GetXaxis()->SetLimits(0, waveform.GetNSamples() * 1e-3);
+      envelope->GetXaxis()->SetLimits(0, waveform.GetNSamples());
       envelope->GetYaxis()->SetTitle(Form("ch%d [mV]", channels[row]->GetChannelId()));
 
       if (lastRow)
       {
-         envelope->GetXaxis()->SetTitle("time [#mus] = sample index / 1000");
+         envelope->GetXaxis()->SetTitle("sample index (1 sample = 1 ns)");
       }
 
       // The zoom window as a shaded band; the envelope is drawn again on top of it.
       envelope->Draw("AL");
-      zoomBand.DrawBox(settings.zoomStartNs * 1e-3, yMin,
-                       settings.zoomEndNs * 1e-3, yMax);
+      zoomBand.DrawBox(settings.zoomStartNs, yMin, settings.zoomEndNs, yMax);
       envelope->Draw("L");
 
       latex.SetTextSize(0.08);
