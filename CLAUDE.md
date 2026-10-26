@@ -25,7 +25,7 @@ This repository contains the analysis code for the ~1 t Gd-doped water Cherenkov
 - `toolChains/<Chain>/`: a `.tchain` file that runs Tools in sequence, plus one `.ini` per Tool. Create with `./createToolChain.sh <Chain> <Tool1> <Tool2> ...`.
 - `shared/`: classes used by more than one Tool.
 - `iniReader/`: INI parser (inih).
-- Tools communicate through ROOT files: read an input TTree, add new branches, write a new file. Never overwrite the input file.
+- Tools communicate through ROOT files and never overwrite the input file. Within a ToolChain, results are passed on as friend trees (`CODING_STANDARDS.md` §5.1).
 - The ToolFlow example Tools were removed; `tools/convertWaveforms` is the reference Tool.
 
 Build and run (out-of-source, in `~/Desktop/enrg/build`; never create a build directory inside the repository):
@@ -77,3 +77,7 @@ TTree `digitizer_waveforms`. **Each row is one sample**, not one event.
 ## Coding rules
 
 Before writing a Tool, a ToolChain or a `shared/` class, read **`CODING_STANDARDS.md`** and follow it.
+
+**Changes to `shared/` always need the user's approval.** `shared/` is the code that all Tools have in common, and the user wants to know exactly what is in it. Before writing a Tool, check whether it needs a new `shared/` class or a change to an existing one (new methods, changed interfaces). If it does, stop and ask the user first: say which class, why it belongs in `shared/` rather than in the Tool, and what its interface would look like. Do not create or change anything in `shared/` until the user has approved it. This also applies to code moved out of an existing Tool into `shared/`.
+
+**Agree on the config before writing a Tool.** Before any code of a new Tool is written, propose its complete `config.ini` to the user (every section and key, with unit, default value and comment, and what each key controls) and ask the user to approve it. List the open questions about the parameters explicitly. Do not run `./createTool.sh` or write `main.cpp` until the user has approved the config. Adding, removing or renaming a key in an existing Tool also needs the user's approval first.

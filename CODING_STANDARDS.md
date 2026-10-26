@@ -81,6 +81,9 @@ tools/<toolName>/
 - The Tool function **returns `int`**: 0 on success, non-zero on failure, and `main()` returns that value. This lets a ToolChain stop at the failing step. (The `void` return type in the ToolFlow template is changed accordingly.)
 - A Tool does **one job**. "Compute the baseline" and "find pulses" are two Tools.
 - Code used by two or more Tools moves to `shared/`; it is not copied.
+- Shared code that keeps no state is written as free functions in a namespace, not
+  as a class. Start with a single namespace and split it by topic only when it grows
+  too large.
 - Tools that open a graphics window (`TApplication`) are for visualisation only and are not used in ToolChains. Tools in a ToolChain run in batch mode.
 
 ## 4. Configuration (`config.ini`)
@@ -110,6 +113,8 @@ maxEvents = -1              ; -1 = all events
 ## 5. Input and output
 
 - **Input files are never overwritten.** Output always goes to a new file.
+- A Tool does not have to write a ROOT file; it may, for example, only read one and
+  produce histograms.
 - Output file names show the run number and the processing step: `run_<N>_<step>.root`.
 - When reading large TTrees, enable only the branches that are needed:
 
@@ -119,7 +124,17 @@ tree->SetBranchStatus("value_mv", 1);
 ```
 
 - **[DECISION]** Every output ROOT file stores provenance as `TNamed` objects: the Tool name, the full config file content and the git commit hash (`git rev-parse --short HEAD`). A common helper in `shared/` does this.
-- The raw ENRGDAQ file (one row per sample) is read **only through a common reader class** (e.g. `shared/WaveformReader`). Grouping rows into events and channels is done in one place, not re-implemented in every Tool. The reader does not assume a fixed record length; it finds it by counting rows.
+
+### 5.1 Passing results between Tools
+
+- A Tool in a ToolChain passes its per-event results to the next Tools as a friend
+  tree: its output holds only its new branches plus `eventCounter`, and the next
+  Tools join it to their input with `TTree::AddFriend`.
+- The output has exactly one entry per input entry, in the same order. No event is
+  skipped; an event that cannot be processed still gets an entry, marked with a flag.
+- A Tool that reads friend files checks that each one has the same number of entries
+  as its input tree and the same `eventCounter` in every entry, and stops with an
+  error otherwise.
 
 ## 6. README template (one per Tool)
 
