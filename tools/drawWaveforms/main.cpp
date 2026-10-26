@@ -267,7 +267,9 @@ void DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
 
       // Right: zoom window, every sample.
       mainPad->cd(2 * row + 2);
-      gPad->SetMargin(0.10, 0.02, bottomMargin, kPanelTopMargin);
+      // The right margin leaves room for the last x label, which is centred on the
+      // end of the axis.
+      gPad->SetMargin(0.10, 0.05, bottomMargin, kPanelTopMargin);
 
       if (settings.zoomStartNs > lastSample)
       {
