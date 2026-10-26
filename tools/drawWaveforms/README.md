@@ -132,7 +132,7 @@ all samples, the baseline and rms from the first `baselineWindowNs` samples.
 | analysis | `firstEntry` | entry | first tree entry to draw |
 | analysis | `maxEvents` | events | number of events to draw, -1 = all |
 | analysis | `channels` | | channels to draw, one row each, in this order |
-| analysis | `baselineWindowNs` | ns | leading samples used for the displayed baseline and rms |
+| analysis | `baselineWindowNs` | ns | leading samples used for the displayed baseline and rms (`Utils::ComputeBaseline`); must be ≥ 1 |
 | analysis | `pulseSearchStartNs` | ns | start of the zoom-centre search window |
 | analysis | `pulseSearchEndNs` | ns | end of the zoom-centre search window |
 | analysis | `pulseThresholdMv` | mV | minimum depth below baseline that counts as a pulse |

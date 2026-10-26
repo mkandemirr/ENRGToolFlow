@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <optional>
@@ -21,6 +20,7 @@
 #include "ConfigReader.h"
 #include "Event.h"
 #include "INIReader.h"
+#include "Utils.h"
 
 // Returns 0 on success, non-zero on failure.
 int drawWaveforms(const INIReader& iniReader);
@@ -83,21 +83,10 @@ ChannelStats ComputeStats(const Waveform& waveform, const DisplaySettings& setti
 {
    ChannelStats stats;
    const UInt_t nSamples = waveform.GetNSamples();
-   const UInt_t nBaseline = std::max<UInt_t>(1, std::min(settings.baselineWindowNs,
-                                                          nSamples));
-   double sum = 0;
-   double sum2 = 0;
-
-   for (UInt_t i = 0; i < nBaseline; ++i)
-   {
-      const double value = waveform.GetValueMv(i);
-      sum += value;
-      sum2 += value * value;
-   }
-
-   stats.baselineMv = sum / nBaseline;
-   stats.rmsMv = std::sqrt(std::max(0.0, sum2 / nBaseline
-                                         - stats.baselineMv * stats.baselineMv));
+   const Utils::BaselineResult baseline =
+      Utils::ComputeBaseline(waveform, 0, settings.baselineWindowNs);
+   stats.baselineMv = baseline.meanMv;
+   stats.rmsMv = baseline.rmsMv;
    stats.minMv = waveform.GetValueMv(0);
    stats.maxMv = waveform.GetValueMv(0);
 
@@ -401,8 +390,10 @@ int drawWaveforms(const INIReader& iniReader)
    const long long maxEvents = config.GetInteger("analysis", "maxEvents");
    const std::vector<int> channelIds = config.GetIntegerList("analysis", "channels");
 
+   const long long baselineWindowNs = config.GetInteger("analysis", "baselineWindowNs");
+
    DisplaySettings settings;
-   settings.baselineWindowNs = config.GetInteger("analysis", "baselineWindowNs");
+   settings.baselineWindowNs = baselineWindowNs;
    settings.pulseSearchStartNs = config.GetInteger("analysis", "pulseSearchStartNs");
    settings.pulseSearchEndNs = config.GetInteger("analysis", "pulseSearchEndNs");
    settings.pulseThresholdMv = config.GetReal("analysis", "pulseThresholdMv");
@@ -415,6 +406,14 @@ int drawWaveforms(const INIReader& iniReader)
 
    if (!config.IsValid())
    {
+      return 1;
+   }
+
+   // Checked before the conversion to UInt_t matters: a negative value would wrap
+   // to a huge window and silently use the whole record, pulses included.
+   if (baselineWindowNs < 1)
+   {
+      std::cerr << "Error: baselineWindowNs must be at least 1" << std::endl;
       return 1;
    }
 
