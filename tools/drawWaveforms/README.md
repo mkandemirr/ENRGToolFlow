@@ -27,19 +27,18 @@ PDF file `run_<N>_drawWaveforms.pdf`. Each page shows:
 
 ### Zoom centre (dashed red line)
 
-The dashed red line marks the zoom centre: the sample on which the right-hand zoom
-panels are centred. It is a time position (a sample index), not a voltage, and it is
-the same for all channels of the page. It is found as follows:
+The dashed red line marks the zoom centre. It is found as follows:
 
-1. Only samples inside [`pulseSearchStartNs`, `pulseSearchEndNs`] are considered.
-   A deeper pulse outside this window is ignored.
-2. For every drawn channel, the depth of each of these samples below the channel's
-   displayed baseline (the mean of its first `baselineWindowNs` samples) is
-   computed: `value − baseline`.
-3. The sample with the most negative depth over all drawn channels becomes the zoom
-   centre, provided it is deeper than `pulseThresholdMv`.
-4. If no sample is deeper than `pulseThresholdMv` (no clear pulse in the window),
-   the middle of the window is used instead.
+1. Only the search window is considered: `pulseSearchStartNs` – `pulseSearchEndNs`.
+2. For every sample in this window, in all channels, the depth below the baseline
+   is computed: `value − baseline`.
+3. If the deepest sample is deeper than `pulseThresholdMv`, the dashed line is drawn
+   there.
+4. If no sample is deeper than `pulseThresholdMv`, the line is drawn at the middle
+   of the window.
+
+The single position found is drawn at the same place in all channels. The
+right-hand panel shows ± `zoomHalfWidthNs` around this position.
 
 The line therefore marks the deepest pulse of the event, not the minimum of each
 channel. The minimum of each channel and its position are written in the panel
@@ -65,15 +64,10 @@ section 5.2), hence the default window 10000–12500. The same reasoning sets
 
 ### Zoom range and page header
 
-The right-hand panels show the samples within ± `zoomHalfWidthNs` of the zoom
-centre:
-
-    right-hand range = [zoom centre − zoomHalfWidthNs, zoom centre + zoomHalfWidthNs]
-
 The search window [`pulseSearchStartNs`, `pulseSearchEndNs`] only decides where the
-zoom centre is looked for; it is not the range that is drawn. With
-`zoomHalfWidthNs = 100` every zoom panel is 200 ns wide, and the zoom centre is
-always in the middle of it. The dashed line is drawn only in the left-hand panels.
+zoom centre is looked for; it is not the range that is drawn. Every zoom panel is
+2 × `zoomHalfWidthNs` wide, with the zoom centre in its middle. The dashed line is
+drawn only in the left-hand panels.
 
 The second line of the page header gives both values for that event, for example:
 
@@ -100,7 +94,8 @@ show samples 12–212 instead of the pulse.
 The left-hand panel shows the whole record of a channel (65 536 samples in run
 103), but its frame is only about 700 pixels wide (the canvas is 1600 pixels wide
 and holds two columns). Drawing every sample would put about 90 points on each pixel
-column, make the PDF large and slow down drawing, without showing anything more. The panel is therefore drawn as a min/max envelope:
+column, make the PDF large and slow down drawing, without showing anything more.
+The panel is therefore drawn as a min/max envelope:
 
 1. The samples of the channel are split into `nEnvelopeBins` equal bins. With
    65 536 samples and `nEnvelopeBins = 2000`, each bin holds about 33 samples, i.e.
@@ -123,9 +118,9 @@ zoom panel, where every sample is drawn.
 | ≥ number of samples | 1 | every sample drawn (capped at the number of samples) |
 
 The bin boundaries are computed per channel from that channel's own number of
-samples, so channels of different length are handled correctly. The minimum,
-baseline and rms written in the panel are computed from all samples, not from the
-envelope.
+samples, so channels of different length are handled correctly. The values written
+in the panel are not taken from the envelope: the minimum and its position come from
+all samples, the baseline and rms from the first `baselineWindowNs` samples.
 
 ## Configuration
 | Section | Key | Unit | Description |
@@ -159,8 +154,6 @@ All keys are required.
 - Visualisation only; runs in batch mode and writes a PDF (no interactive window).
 - `value_mv` is already baseline-subtracted by ENRGDAQ; the displayed baseline is
   the residual offset of the first samples, not a calibrated baseline.
-- The pulse search window depends on the trigger configuration of the run and must
-  be set per run.
 - The "possible saturation" criterion does not use the real clipping level, which
   depends on the DC offset and is not stored in the file. `minSaturationDepthMv`
   must be set per run, just above the clipping depth given by the DC offset; it
@@ -168,4 +161,3 @@ All keys are required.
   flagged. The default of 900 mV is for run 103, where the baseline sits at about
   1005 of 1023 ADC counts and the lower limit is about -969 to -981 mV
   (`docs/Taban_Cizgisi_ve_Pedestal.docx`). Not yet tested on a saturated event.
-- Events are selected by tree entry; the header also shows `eventCounter`.
