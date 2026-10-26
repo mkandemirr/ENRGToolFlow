@@ -6,11 +6,11 @@
 #include <vector>
 
 #include <TAxis.h>
+#include <TBox.h>
 #include <TCanvas.h>
 #include <TFile.h>
 #include <TGraph.h>
 #include <TLatex.h>
-#include <TLine.h>
 #include <TPad.h>
 #include <TROOT.h>
 #include <TStyle.h>
@@ -203,7 +203,7 @@ void DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
    latex.DrawLatex(0.01, 0.968,
                    Form("%zu channels, up to %u samples (1 sample = 1 ns). Left: full "
                         "window [#mus], min/max envelope in %u bins. Right: samples "
-                        "%u-%u (dashed lines on the left).",
+                        "%u-%u (red band on the left).",
                         nRows, nSamplesShown, settings.nEnvelopeBins,
                         settings.zoomStartNs, settings.zoomEndNs));
 
@@ -212,9 +212,9 @@ void DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
    mainPad->Draw();
    mainPad->Divide(2, nRows, 0.002, 0.001);
 
-   TLine line;
-   line.SetLineColor(kRed + 1);
-   line.SetLineStyle(2);
+   TBox zoomBand;
+   zoomBand.SetFillColorAlpha(kRed, 0.25);
+   zoomBand.SetLineWidth(0);
 
    for (size_t row = 0; row < nRows; ++row)
    {
@@ -253,9 +253,11 @@ void DrawEventPage(TCanvas* canvas, const Event& event, Long64_t entry,
          envelope->GetXaxis()->SetTitle("time [#mus] = sample index / 1000");
       }
 
+      // The zoom window as a shaded band; the envelope is drawn again on top of it.
       envelope->Draw("AL");
-      line.DrawLine(settings.zoomStartNs * 1e-3, yMin, settings.zoomStartNs * 1e-3, yMax);
-      line.DrawLine(settings.zoomEndNs * 1e-3, yMin, settings.zoomEndNs * 1e-3, yMax);
+      zoomBand.DrawBox(settings.zoomStartNs * 1e-3, yMin,
+                       settings.zoomEndNs * 1e-3, yMax);
+      envelope->Draw("L");
 
       latex.SetTextSize(0.08);
       latex.SetTextAlign(31);

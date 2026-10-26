@@ -17,9 +17,9 @@ PDF file `run_<N>_drawWaveforms.pdf`. Each page shows:
 - header: input file, tree entry, `eventCounter` (the two differ after counter
   gaps), t0 (`triggerTimeNs`) and the `qualityFlags` of the event;
 - left panel per channel: the full window in µs, drawn as a min/max envelope in
-  `nEnvelopeBins` bins (single-sample spikes stay visible); the two dashed red lines
-  mark the zoom window; the text gives the minimum, its position and the maximum
-  of all samples of the channel;
+  `nEnvelopeBins` bins (single-sample spikes stay visible); a light red band marks
+  the zoom window; the text gives the minimum, its position and the maximum of all
+  samples of the channel;
 - right panel per channel: every sample from `zoomStartNs` to `zoomEndNs`.
 
 The values are `value_mv` as written by ENRGDAQ, which is already
@@ -32,6 +32,10 @@ pulse falls in the record depends on the digitizer settings of the run (record
 length and post-trigger size), so the window must be set per run. In run 103 the
 prompt pulses peak at sample index ≈ 11 206–11 224
 (`docs/ENRGDAQ_Veri_Formati.docx`, section 5.2), hence the default 11150–11350.
+
+The band has the true width of the window on the µs axis. A narrow window (the
+default 200 ns is about 0.3 % of a 65 536-sample record) is therefore a thin
+stripe of a few pixels; a wider window shows as a wider band.
 
 If the window extends past the end of a channel's record, the panel is cut at the
 last sample. If it starts after the last sample, the panel says so instead.
