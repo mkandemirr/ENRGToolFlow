@@ -1,5 +1,7 @@
 #include "Utils.h"
 
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <memory>
 
@@ -8,6 +10,8 @@
 #include <TFriendElement.h>
 #include <TLeaf.h>
 #include <TTree.h>
+
+#include "Waveform.h"
 
 namespace
 {
@@ -66,6 +70,36 @@ bool ReadEventCounters(TTree* tree, const std::string& label,
 
 namespace Utils
 {
+BaselineResult ComputeBaseline(const Waveform& waveform, UInt_t firstSample,
+                               UInt_t nSamples)
+{
+   BaselineResult result;
+   const UInt_t end = static_cast<UInt_t>(
+      std::min<ULong64_t>(static_cast<ULong64_t>(firstSample) + nSamples,
+                          waveform.GetNSamples()));
+
+   if (firstSample >= end)
+   {
+      return result;
+   }
+
+   double sum = 0;
+   double sum2 = 0;
+
+   for (UInt_t i = firstSample; i < end; ++i)
+   {
+      const double value = waveform.GetValueMv(i);
+      sum += value;
+      sum2 += value * value;
+   }
+
+   result.nSamples = end - firstSample;
+   result.meanMv = sum / result.nSamples;
+   result.rmsMv = std::sqrt(std::max(0.0, sum2 / result.nSamples
+                                          - result.meanMv * result.meanMv));
+   return result;
+}
+
 bool AddFriends(TTree* tree, const std::vector<std::string>& friendFiles,
                 const std::vector<std::string>& friendTreeNames)
 {
