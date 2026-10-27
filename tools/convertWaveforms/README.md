@@ -53,8 +53,10 @@ for (const Channel& channel : event.GetChannels())   // all blocks, stored order
 }
 ```
 
-`qualityFlags` is the sum of the values of the checks that found a problem; 0 means
-no problem. A flagged event is still complete and is never skipped. Each check can
+`qualityFlags` is computed for every event: the sum of the values of the checks
+that found a problem in that event; 0 means no problem. Bits 0–3 look at the event
+alone, bits 4–6 compare it with the previous event (always 0 for the first event).
+A flagged event is still complete and is never skipped. Each check can
 be switched off in the config; its bit is then always 0.
 
 | Bit | Value | Config switch | Meaning |
