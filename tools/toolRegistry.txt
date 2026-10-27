@@ -1,5 +1,6 @@
-Total tools: 3
+Total tools: 4
 
 convertWaveforms
 drawWaveforms
+findTriggerPosition
 runPipeline
