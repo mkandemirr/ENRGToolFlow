@@ -53,17 +53,23 @@ for (const Channel& channel : event.GetChannels())   // all blocks, stored order
 }
 ```
 
-`qualityFlags` bits (a flagged event is still complete and is never skipped):
+`qualityFlags` is the sum of the values of the checks that found a problem; 0 means
+no problem. A flagged event is still complete and is never skipped. Each check can
+be switched off in the config; its bit is then always 0.
 
-| Bit | Value | Meaning |
-|---|---|---|
-| 0 | 1 | a channel from `expectedChannels` is missing |
-| 1 | 2 | a channel appears in more than one block |
-| 2 | 4 | channel blocks have different lengths |
-| 3 | 8 | a block length equals `daqMaxSamplesPerChannel` (record may be truncated by ENRGDAQ) |
-| 4 | 16 | `eventCounter` increased by more than 1 since the previous event |
-| 5 | 32 | `eventCounter` decreased |
-| 6 | 64 | `triggerTimeNs` decreased |
+| Bit | Value | Config switch | Meaning |
+|---|---|---|---|
+| 0 | 1 | `checkMissingChannel` | a channel from `expectedChannels` is missing |
+| 1 | 2 | `checkDuplicateChannel` | a channel appears in more than one block |
+| 2 | 4 | `checkUnequalLength` | channel blocks have different lengths |
+| 3 | 8 | `checkDaqLimit` | a block length equals `daqMaxSamplesPerChannel` (record may be truncated by ENRGDAQ) |
+| 4 | 16 | `checkCounterGap` | `eventCounter` increased by more than 1 since the previous event |
+| 5 | 32 | `checkCounterBackward` | `eventCounter` decreased |
+| 6 | 64 | `checkTimeBackward` | `triggerTimeNs` decreased |
+
+Example: `qualityFlags = 9` = 8 + 1, i.e. a missing channel and a block at the DAQ
+limit. In ROOT, select events with one problem with a bitwise AND, e.g.
+`events->Draw("eventCounter", "(qualityFlags & 8) != 0")`.
 
 ## Configuration
 | Section | Key | Unit | Description |
@@ -75,9 +81,10 @@ for (const Channel& channel : event.GetChannels())   // all blocks, stored order
 | output | `treeName` | | output TTree name (`events`) |
 | output | `compressionSetting` | | ROOT compression, 100 × algorithm + level (505 = ZSTD level 5) |
 | output | `overwriteOutput` | | `false` = stop if the output file already exists |
-| analysis | `expectedChannels` | | comma-separated channel list, used only for bit 0 |
-| analysis | `daqMaxSamplesPerChannel` | samples | ENRGDAQ per-channel limit of the run, used only for bit 3: 2048 before 06.06.2026, 65536 from 06.06 to 15.09.2026, 131072 afterwards |
 | analysis | `maxEvents` | events | number of events to convert, -1 = all |
+| qualityFlags | `check...` | | seven switches, `true` = check is done, `false` = its bit is always 0 (see the bit table above) |
+| qualityFlags | `expectedChannels` | | comma-separated channel list, used only for bit 0 |
+| qualityFlags | `daqMaxSamplesPerChannel` | samples | ENRGDAQ per-channel limit of the run, used only for bit 3: 2048 before 06.06.2026, 65536 from 06.06 to 15.09.2026, 131072 afterwards |
 
 All keys are required.
 
@@ -95,4 +102,6 @@ All keys are required.
 - Two events with the same `event_counter` in adjacent rows cannot be separated;
   the timestamp check then stops the Tool.
 - Only the `events` tree is written. The summary (flag counts, record length
-  distribution, missing events) is printed to the terminal.
+  distribution, missing events) is printed to the terminal. A check switched off
+  in the config is shown there as "not checked"; the output file itself does not
+  record which checks were on.

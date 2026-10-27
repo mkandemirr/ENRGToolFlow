@@ -4,6 +4,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <TFile.h>
@@ -97,11 +98,30 @@ int convertWaveforms(const INIReader& iniReader)
    const std::string outputTreeName = config.GetString("output", "treeName");
    const long long compressionSetting = config.GetInteger("output", "compressionSetting");
    const bool overwriteOutput = config.GetBoolean("output", "overwriteOutput");
-   const std::vector<int> expectedChannels =
-      config.GetIntegerList("analysis", "expectedChannels");
-   const long long daqMaxSamplesPerChannel =
-      config.GetInteger("analysis", "daqMaxSamplesPerChannel");
    const long long maxEvents = config.GetInteger("analysis", "maxEvents");
+   const std::vector<int> expectedChannels =
+      config.GetIntegerList("qualityFlags", "expectedChannels");
+   const long long daqMaxSamplesPerChannel =
+      config.GetInteger("qualityFlags", "daqMaxSamplesPerChannel");
+
+   // Bits of the checks switched on in the config; the other bits are always 0.
+   const std::pair<const char*, UInt_t> checkKeys[Event::kNQualityBits] = {
+      {"checkMissingChannel", Event::kMissingChannel},
+      {"checkDuplicateChannel", Event::kDuplicateChannel},
+      {"checkUnequalLength", Event::kUnequalLength},
+      {"checkDaqLimit", Event::kAtDaqLimit},
+      {"checkCounterGap", Event::kCounterGap},
+      {"checkCounterBackward", Event::kCounterBackward},
+      {"checkTimeBackward", Event::kTimeBackward}};
+   UInt_t enabledChecks = 0;
+
+   for (const auto& [key, bit] : checkKeys)
+   {
+      if (config.GetBoolean("qualityFlags", key))
+      {
+         enabledChecks |= bit;
+      }
+   }
 
    if (!config.IsValid())
    {
@@ -226,6 +246,7 @@ int convertWaveforms(const INIReader& iniReader)
          }
       }
 
+      flags &= enabledChecks;
       event.SetQualityFlags(flags);
       outputTree->Fill();
 
@@ -284,8 +305,16 @@ int convertWaveforms(const INIReader& iniReader)
 
    for (int bit = 0; bit < Event::kNQualityBits; ++bit)
    {
-      std::cout << "  bit " << bit << " (" << Event::GetQualityBitName(bit) << "): "
-                << qualityBitCounts[bit] << std::endl;
+      std::cout << "  bit " << bit << " (" << Event::GetQualityBitName(bit) << "): ";
+
+      if (enabledChecks & (1u << bit))
+      {
+         std::cout << qualityBitCounts[bit] << std::endl;
+      }
+      else
+      {
+         std::cout << "not checked" << std::endl;
+      }
    }
 
    std::cout << "Missing events (counter gaps): " << nMissingEvents << std::endl;
